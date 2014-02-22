@@ -1,8 +1,9 @@
 ﻿<Properties>
   <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" PreferredExecutionTarget="MonoDevelop.Default" />
-  <MonoDevelop.Ide.Workbench ActiveDocument="Assets\scripts\FPSController.cs">
+  <MonoDevelop.Ide.Workbench ActiveDocument="Assets\scripts\GhostController.cs">
     <Files>
-      <File FileName="Assets\scripts\FPSController.cs" Line="32" Column="34" />
+      <File FileName="Assets\scripts\FPSController.cs" Line="51" Column="58" />
+      <File FileName="Assets\scripts\GhostController.cs" Line="7" Column="36" />
     </Files>
   </MonoDevelop.Ide.Workbench>
   <MonoDevelop.Ide.DebuggingService.Breakpoints>
