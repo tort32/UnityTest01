@@ -5,6 +5,7 @@ public class ProceduralMesh : MonoBehaviour
 
 	public float radius = 2;
 	public int slices = 16;
+	public float displacementMagnitude = 0.2f;
 
 	// Use this for initialization
 	void Start ()
@@ -16,19 +17,19 @@ public class ProceduralMesh : MonoBehaviour
 		// Create height map
 		//Texture2D heightMap = mf.renderer.material.GetTexture (0) as Texture2D;
 		Texture2D sourceMap = mf.renderer.material.GetTexture (0) as Texture2D;
-		Texture2D heightMap = new Texture2D (sourceMap.width, sourceMap.height, TextureFormat.RGB24, false);
-		heightMap.filterMode = FilterMode.Point;
+		Texture2D heightMap = new Texture2D (sourceMap.width, sourceMap.height);
+		heightMap.filterMode = FilterMode.Trilinear;
 
 		// Init height data
 		Color[] cols = new Color[heightMap.width * heightMap.height];
 		Color[] colsOut = new Color[heightMap.width * heightMap.height];
-
+		
+		cols = (mf.renderer.material.GetTexture (0) as Texture2D).GetPixels ();
 		/*for(int n = 0; n < heightMap.width * heightMap.height; ++n)
 		{
-			float value = Random.Range(0.0f,1.0f);
-			cols[n] = new Color(value,value,value);
+			float value = Random.Range(-0.1f,0.1f);
+			cols[n] = new Color(Mathf.Clamp01(cols[n].r+value),Mathf.Clamp01(cols[n].r+value),Mathf.Clamp01(cols[n].r+value));
 		}*/
-		cols = (mf.renderer.material.GetTexture (0) as Texture2D).GetPixels ();
 
 		// Generate sphere points for skinning
 		Vector3[] spherePoints = new Vector3[heightMap.width * heightMap.height];
@@ -36,10 +37,12 @@ public class ProceduralMesh : MonoBehaviour
 		{
 			float v = (float)y / (float)(heightMap.height - 1); // [0..1]
 			float theta = Mathf.PI * v;
+			//float z = 1.0f - v * 2.0f;
+			//float theta = Mathf.Acos (z);
 			for (int x = 0; x < heightMap.width; ++x)
 			{
-				//int mapIndex = (heightMap.height - 1 - y) * heightMap.width + (heightMap.width - 1 - x); // inverted UV
-				int mapIndex = y * heightMap.width + x;
+				int mapIndex = (heightMap.height - 1 - y) * heightMap.width + (heightMap.width - 1 - x); // inverted UV
+				//int mapIndex = y * heightMap.width + x;
 				float u = (float)x / (float)heightMap.width; // [0..1)
 				float phi = 2.0f * Mathf.PI * u;
 				Vector3 point = new Vector3 (
@@ -55,7 +58,7 @@ public class ProceduralMesh : MonoBehaviour
 
 		DebugTimer timer = new DebugTimer("Oct grid building time");
 
-		OctGrid<int> oct = new OctGrid<int>(7,1.0f);
+		OctGrid<int> oct = new OctGrid<int>(32,1.0f);
 		for(int n = 0; n < heightMap.width * heightMap.height; ++n)
 		{
 			Vector3 point = spherePoints[n];
@@ -67,61 +70,43 @@ public class ProceduralMesh : MonoBehaviour
 		DebugTimer timer2 = new DebugTimer("Compute texture smooth");
 
 		// Compute texture smooth with oct grid search
-		float smoothSize = 0.1f;
-		float sqrSmoothSize = smoothSize * smoothSize;
-		oct.SetLookDistance (smoothSize);
-		
+		float smoothSize = 0.05f;
 		for(int n = 0; n < heightMap.width * heightMap.height; ++n)
 		{ 
-			Vector3 point = spherePoints[n];
-
-			float accum = 0.0f;
-			float mass = 0.0f;
-
-			foreach(int m in oct.GetElementsNearTo(point))
+			/*if(n < heightMap.width * heightMap.height / 2)*/
 			{
-				Vector3 pointNear = spherePoints[m];
-				float sqrLen = (point - pointNear).sqrMagnitude;
-				if(sqrLen < sqrSmoothSize)
+				Vector3 point = spherePoints[n];
+
+				float accum = 0.0f;
+				float mass = 0.0f;
+
+				float sm = smoothSize * (point.y * point.y);
+				float sqrSm = sm*sm;
+				//for(int m = 0; m < heightMap.width * heightMap.height; ++m)
+				foreach(int m in oct.GetElementsNearTo(point, sm))
 				{
-					float weight = 2.0f/(1.0f + sqrLen / sqrSmoothSize ) - 1.0f; // (1..0)
-					//float weight = Mathf.Cos( (sqrLen / sqrSmoothSize) * Mathf.PI ) * 0.5f + 0.5f;
-					accum += cols[m].r * weight;
-					mass += weight;
+					Vector3 pointNear = spherePoints[m];
+					float sqrLen = (point - pointNear).sqrMagnitude;
+					if(sqrLen < sqrSm)
+					{
+						float weight = 2.0f/(1.0f + sqrLen / sqrSm ) - 1.0f; // (1..0)
+						//float weight = 2.0f*Mathf.Cos (Mathf.PI * sqrLen / sqrSm ) - 1.0f; // (1..0)
+						accum += cols[m].r * weight;
+						mass += weight;
+					}
+				}
+				if(mass > 0.1f)
+				{
+					float value = Mathf.Clamp01((accum/mass-0.5f)*1.2f+0.5f);
+					colsOut[n] = new Color(value,value,value);
 				}
 			}
-			if(mass >= 0.1f)
+			/*else
 			{
-				float value = accum/mass;
-				colsOut[n] = new Color(value,value,value*value);
-			}
-		}
-		/*
-		for(int n = 0; n < heightMap.width * heightMap.height; ++n)
-		{ 
-			Vector3 point = spherePoints[n];
-
-			float accum = 0.0f;
-			float mass = 0.0f;
-			colsOut[n] = new Color(0,0,1);
-			for(int m = 0; m < heightMap.width * heightMap.height; ++m)
-			{
-				Vector3 pointNear = spherePoints[m];
-				float sqrLen = (point - pointNear).sqrMagnitude;
-				if(sqrLen < sqrSmoothSize)
-				{
-					float weight = 2.0f/(1.0f + sqrLen / sqrSmoothSize) - 1.0f;
-					accum += cols[m].r * weight;
-					mass += weight;
-				}
-			}
-			if(mass >= 0.1f)
-			{
-				float value = accum/mass;
+				float value = cols[n].r;
 				colsOut[n] = new Color(value,value,value);
-			}
+			}*/
 		}
-		*/
 
 		timer2.Stop ();
 
@@ -132,22 +117,33 @@ public class ProceduralMesh : MonoBehaviour
 		mf.renderer.materials[0].mainTexture = heightMap;
 
 		float[] dispMap = new float[slices * slices];
-		int texPerVertX = heightMap.width / slices;
-		int texPerVertY = heightMap.height / slices;
+		float sliceSize = 2.0f*Mathf.PI / (float)slices; // sector of the 1 unit circle
+		float sqrSliceSize = sliceSize * sliceSize;
 		for(int j = 0; j < slices; ++j)
 		{
 			for(int i = 0; i < slices; ++i)
 			{
-				int index = j * slices + i;
-				float height = 0;
-				for(int x = 0; x < texPerVertX; ++x)
-					for(int y = 0; y < texPerVertY; ++y)
+				int x = Mathf.FloorToInt((float)i / (float)slices * (float) heightMap.width); // [0..1)
+				int y = Mathf.CeilToInt((float)j / (float)(slices - 1) * (float) (heightMap.height - 1)); // [0..1]
+				int heightMapIndex = (heightMap.height - 1 - y) * heightMap.width + (heightMap.width - 1 - x);
+				int dispMapIndex = j * slices + i;
+
+				float accum = 0.0f;
+				float mass = 0.0f;
+				Vector3 point = spherePoints[heightMapIndex];
+				foreach(int m in oct.GetElementsNearTo(point, sliceSize))
+				{
+					Vector3 pointNear = spherePoints[m];
+					float sqrLen = (point - pointNear).sqrMagnitude;
+					if(sqrLen < sqrSliceSize)
 					{
-					Color pixel = heightMap.GetPixel(	heightMap.width - (i*texPerVertX + x - texPerVertX/2),
-					                                 	heightMap.height - (j*texPerVertY + y - texPerVertY/2) );
-						height += pixel.r;
+						float weight = 2.0f/(1.0f + sqrLen / sqrSliceSize ) - 1.0f; // (1..0)
+						accum += colsOut[m].r * weight;
+						mass += weight;
 					}
-				dispMap[index] = height/(texPerVertX*texPerVertY);
+				}
+				float height = accum/mass;
+				dispMap[dispMapIndex] = height - 0.5f; // Zero middle
 			}
 		}
 
@@ -170,16 +166,19 @@ public class ProceduralMesh : MonoBehaviour
 				int index = j * vertCountI + i;
 				float u = (float)i / (float)(vertCountI - 1); // [0..1]
 				float phi = 2.0f * Mathf.PI * u;
-				/*Vector3 point = new Vector3 (
+
+				Vector3 point = new Vector3 (
 						Mathf.Sin (theta) * Mathf.Sin (phi),
 						Mathf.Cos (theta),
 						Mathf.Sin (theta) * Mathf.Cos (phi)
 					);
-				vertices[index] = point * (1.0f + dispMap[mapIndex]) * radius;
-				normals[index] = point;*/
+				vertices[index] = point * (radius + dispMap[mapIndex]*displacementMagnitude);
+				normals[index] = point;
 
-				vertices[index] = new Vector3(u*5.0f,dispMap[mapIndex],v*5.0f);
-				normals[index] = new Vector3(0,1,0);
+				/*
+				// DEBUG QUAD
+				vertices[index] = new Vector3(u*5.0f,dispMap[mapIndex]*1.0f,v*5.0f);
+				normals[index] = new Vector3(0,1,0);*/
 
 				uv[index] = new Vector2(1.0f - u, 1.0f - v);
 
