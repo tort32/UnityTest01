@@ -20,16 +20,7 @@ public class ProceduralMesh : MonoBehaviour
 		Texture2D heightMap = new Texture2D (sourceMap.width, sourceMap.height);
 		heightMap.filterMode = FilterMode.Trilinear;
 
-		// Init height data
-		Color[] cols = new Color[heightMap.width * heightMap.height];
-		Color[] colsOut = new Color[heightMap.width * heightMap.height];
-		
-		cols = (mf.renderer.material.GetTexture (0) as Texture2D).GetPixels ();
-		/*for(int n = 0; n < heightMap.width * heightMap.height; ++n)
-		{
-			float value = Random.Range(-0.1f,0.1f);
-			cols[n] = new Color(Mathf.Clamp01(cols[n].r+value),Mathf.Clamp01(cols[n].r+value),Mathf.Clamp01(cols[n].r+value));
-		}*/
+		DebugTimer timer = new DebugTimer("Generate space cloud");
 
 		// Generate sphere points for skinning
 		Vector3[] spherePoints = new Vector3[heightMap.width * heightMap.height];
@@ -54,9 +45,46 @@ public class ProceduralMesh : MonoBehaviour
 			}
 		}
 
+		timer.Stop();
+
+		// Init height data
+		Color[] cols = new Color[heightMap.width * heightMap.height];
+		Color[] colsOut = new Color[heightMap.width * heightMap.height];
+
+		DebugTimer timer2 = new DebugTimer("Generate texture");
+		
+		cols = (mf.renderer.material.GetTexture (0) as Texture2D).GetPixels ();
+		/*for(int n = 0; n < heightMap.width * heightMap.height; ++n)
+		{
+			float value = Random.Range(-0.1f,0.1f);
+			cols[n] = new Color(Mathf.Clamp01(cols[n].r+value),Mathf.Clamp01(cols[n].r+value),Mathf.Clamp01(cols[n].r+value));
+		}*/
+		for(int n = 0; n < heightMap.width * heightMap.height; ++n)
+		{
+			Vector3 point = spherePoints[n]*10;
+
+			float[] w={0.2f,0.5f,3.0f};
+			float[] a={1.0f,0.3f,0.1f};
+
+			float value = 0;
+			for(int i=0;i<3;++i)
+			{
+				value += PerlinNoise.GetValue(point * w[i])*a[i];
+				if(i == 0)
+				{
+					value = Mathf.Clamp(value, -0.2f, 0.2f);
+				}
+			}
+
+			value = Mathf.Clamp01((value+1.0f)*0.5f);
+			cols[n] = new Color(value,value,value);
+		}
+
+		timer2.Stop();
+
 		// Build oct grid to optimize search
 
-		DebugTimer timer = new DebugTimer("Oct grid building time");
+		DebugTimer timer3 = new DebugTimer("Oct grid building time");
 
 		OctGrid<int> oct = new OctGrid<int>(32,1.0f);
 		for(int n = 0; n < heightMap.width * heightMap.height; ++n)
@@ -65,15 +93,16 @@ public class ProceduralMesh : MonoBehaviour
 			oct.AddPoint(point, n);
 		}
 
-		timer.Stop();
+		timer3.Stop();
 
-		DebugTimer timer2 = new DebugTimer("Compute texture smooth");
+		DebugTimer timer4 = new DebugTimer("Compute texture smooth");
 
 		// Compute texture smooth with oct grid search
+		/*
 		float smoothSize = 0.05f;
 		for(int n = 0; n < heightMap.width * heightMap.height; ++n)
 		{ 
-			/*if(n < heightMap.width * heightMap.height / 2)*/
+			if(n < heightMap.width * heightMap.height / 2)
 			{
 				Vector3 point = spherePoints[n];
 
@@ -101,15 +130,17 @@ public class ProceduralMesh : MonoBehaviour
 					colsOut[n] = new Color(value,value,value);
 				}
 			}
-			/*else
+			else
 			{
 				float value = cols[n].r;
 				colsOut[n] = new Color(value,value,value);
-			}*/
-		}
+			}
+		}*/
 
-		timer2.Stop ();
+		colsOut = cols;
 
+		timer4.Stop ();
+		
 		// Update diffuse texture
 		heightMap.SetPixels (colsOut);
 		heightMap.Apply ();
