@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using System.Linq;
 
 public class ProceduralMesh : MonoBehaviour
 {
@@ -16,8 +17,9 @@ public class ProceduralMesh : MonoBehaviour
 		
 		// Create height map
 		//Texture2D heightMap = mf.renderer.material.GetTexture (0) as Texture2D;
-		Texture2D sourceMap = mf.renderer.material.GetTexture (0) as Texture2D;
-		Texture2D heightMap = new Texture2D (sourceMap.width, sourceMap.height);
+		//Texture2D sourceMap = mf.renderer.material.GetTexture (0) as Texture2D;
+		//Texture2D heightMap = new Texture2D (sourceMap.width, sourceMap.height);
+		Texture2D heightMap = new Texture2D (512, 512);
 		heightMap.filterMode = FilterMode.Trilinear;
 
 		DebugTimer timer = new DebugTimer("Generate space cloud");
@@ -53,7 +55,7 @@ public class ProceduralMesh : MonoBehaviour
 
 		DebugTimer timer2 = new DebugTimer("Generate texture");
 		
-		cols = (mf.renderer.material.GetTexture (0) as Texture2D).GetPixels ();
+		//cols = (mf.renderer.material.GetTexture (0) as Texture2D).GetPixels ();
 		/*for(int n = 0; n < heightMap.width * heightMap.height; ++n)
 		{
 			float value = Random.Range(-0.1f,0.1f);
@@ -137,15 +139,107 @@ public class ProceduralMesh : MonoBehaviour
 			}
 		}*/
 
-		colsOut = cols;
+		for(int n = 0; n < heightMap.width * heightMap.height; ++n)
+		{ 
+			colsOut[n] = cols[n];
+		}
 
 		timer4.Stop ();
-		
+
+		DebugTimer timer5 = new DebugTimer("Morph the texture");
+
+		for(int i=0; i<10; ++i)
+		{
+			// Find impact point
+			float z = Random.Range(-1.0f, 1.0f);
+			float theta = Mathf.Acos (z);
+			float phi = Random.Range(0.0f, 2.0f * Mathf.PI);
+
+			Vector3 point = new Vector3 (
+				Mathf.Sin (theta) * Mathf.Sin (phi),
+				Mathf.Cos (theta),
+				Mathf.Sin (theta) * Mathf.Cos (phi)
+				);
+
+			// Find nearest textel
+			float texSize = 2.0f*Mathf.PI / (float)heightMap.width; // size of the textel at the equator
+			float sqrMinLen = texSize*texSize;
+			int n = -1; // nearest textel index
+			foreach(int m in oct.GetElementsNearTo(point, texSize))
+			{
+				Vector3 pointNear = spherePoints[m];
+				float sqrLen = (point - pointNear).sqrMagnitude;
+				if(sqrLen < sqrMinLen)
+				{
+					n = m;
+					sqrMinLen = sqrLen;
+				}
+			}
+
+			// Form a crater around the impact point
+			float sm = 2.0f/(Mathf.Sqrt(i)+10.0f);
+			float sqrSm = sm*sm;
+			float holeDepth = sm * 0.5f;
+
+			foreach(int m in oct.GetElementsNearTo(point, sm))
+			{
+				Vector3 pointNear = spherePoints[m];
+				float sqrLen = (point - pointNear).sqrMagnitude;
+				if(sqrLen < sqrSm)
+				{
+					float weight = 2.0f/(1.0f + sqrLen / sqrSm ) - 1.0f; // (1..0)
+					float holeValue = cols[n].r - holeDepth * weight;
+					float value = Mathf.Min(cols[m].r, holeValue);
+					colsOut[m] = new Color(value,value,value);
+				}
+			}
+		}
+
+		timer5.Stop ();
+
 		// Update diffuse texture
 		heightMap.SetPixels (colsOut);
 		heightMap.Apply ();
 
-		mf.renderer.materials[0].mainTexture = heightMap;
+		/*UnityEditor.TextureImporter ti = new UnityEditor.TextureImporter();
+		ti.normalmap = true;
+		ti.convertToNormalmap = true;
+		ti.*/
+
+		// Build Normalmap
+		Texture2D normalMap = new Texture2D(heightMap.width, heightMap.height);
+		Color[] colsNormal = new Color[heightMap.width * heightMap.height];
+		for (int y = 0; y < heightMap.height; ++y)
+		{
+			for (int x = 0; x < heightMap.width; ++x)
+			{
+				float h0 = heightMap.GetPixel(x,y).r;
+				float h1 = heightMap.GetPixel((x + 1) % heightMap.width, y ).r;
+				float h2 = heightMap.GetPixel(x, (y + 1) % heightMap.height ).r;
+
+				const float bumpFactor = 0.05f;
+				float sideMove = 1.0f/((float)heightMap.width*bumpFactor);
+				Vector3 v01 = new Vector3(sideMove, 0, h1 - h0);
+				Vector3 v02 = new Vector3(0, sideMove, h2 - h0);
+
+				//int mapIndex = (heightMap.height - 1 - y) * heightMap.width + (heightMap.width - 1 - x); // inverted UV
+				int mapIndex = y * heightMap.width + x;
+				Vector3 n = Vector3.Cross( v01, v02 ).normalized;
+				//Vector3 n = spherePoints[mapIndex];
+
+				//colsNormal[mapIndex] = new Color(Mathf.Clamp01(n.x * 0.5f + 0.5f),Mathf.Clamp01(n.y * 0.5f + 0.5f),Mathf.Clamp01(n.z * 0.5f + 0.5f));
+				colsNormal[mapIndex] = new Color(n.x * 0.5f + 0.5f,n.y * 0.5f + 0.5f,n.z * 0.5f + 0.5f);
+			}
+		}
+		normalMap.SetPixels(colsNormal);
+		normalMap.anisoLevel = 1;
+		normalMap.Apply();
+
+		// Update material
+		//mf.renderer.materials[0].mainTexture = normalMap;
+		//mf.renderer.materials[0].SetTexture("_BumpMap", normalMap);
+
+		// Build displacement grid
 
 		float[] dispMap = new float[slices * slices];
 		float sliceSize = 2.0f*Mathf.PI / (float)slices; // sector of the 1 unit circle
@@ -184,6 +278,7 @@ public class ProceduralMesh : MonoBehaviour
 		int vertCount = vertCountI * vertCountJ;
 		Vector3[] vertices = new Vector3[vertCount];
 		Vector3[] normals = new Vector3[vertCount];
+		Vector4[] tangents = new Vector4[vertCount];
 		Vector2[] uv = new Vector2[vertCount];
 		for (int j = 0; j < vertCountJ; ++j)
 		{
@@ -204,7 +299,14 @@ public class ProceduralMesh : MonoBehaviour
 						Mathf.Sin (theta) * Mathf.Cos (phi)
 					);
 				vertices[index] = point * (radius + dispMap[mapIndex]*displacementMagnitude);
+
 				normals[index] = point;
+
+				/*Vector3 t = new Vector3(Mathf.Cos(phi), 0, -Mathf.Sin(phi));
+				Vector3 tmp = (t - point * Vector3.Dot(point, t)).normalized;
+				tangents[index] = new Vector4(tmp.x, tmp.y, tmp.z, 1.0f);*/
+
+				tangents[index] = new Vector4( Mathf.Cos(phi), 0, -Mathf.Sin(phi), 1);
 
 				/*
 				// DEBUG QUAD
@@ -220,6 +322,7 @@ public class ProceduralMesh : MonoBehaviour
 		}
 		mesh.vertices = vertices;
 		mesh.normals = normals;
+		mesh.tangents = tangents;
 		mesh.uv = uv;
 
 		// Generate triangles
