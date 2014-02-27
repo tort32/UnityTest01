@@ -148,7 +148,8 @@ public class ProceduralMesh : MonoBehaviour
 
 		DebugTimer timer5 = new DebugTimer("Morph the texture");
 
-		for(int i=0; i<10; ++i)
+		int impacts = 100;
+		for(int i=0; i<impacts; ++i)
 		{
 			// Find impact point
 			float z = Random.Range(-1.0f, 1.0f);
@@ -179,7 +180,7 @@ public class ProceduralMesh : MonoBehaviour
 			// Form a crater around the impact point
 			float sm = 2.0f/(Mathf.Sqrt(i)+10.0f);
 			float sqrSm = sm*sm;
-			float holeDepth = sm * 0.5f;
+			float holeDepth = sm * 2.0f;
 
 			foreach(int m in oct.GetElementsNearTo(point, sm))
 			{
@@ -188,32 +189,35 @@ public class ProceduralMesh : MonoBehaviour
 				if(sqrLen < sqrSm)
 				{
 					float weight = 2.0f/(1.0f + sqrLen / sqrSm ) - 1.0f; // (1..0)
-					float holeValue = cols[n].r - holeDepth * weight;
+					float holeValue = cols[m].r - holeDepth * weight;
 					float value = Mathf.Min(cols[m].r, holeValue);
 					colsOut[m] = new Color(value,value,value);
 				}
 			}
-		}
 
+			float noiseValue = 1.0f/(float)impacts;
+			for(int j = 0; j < heightMap.width * heightMap.height; ++j)
+			{
+				float value = Random.Range(-noiseValue, noiseValue);
+				cols[j] = new Color(colsOut[j].r + value, colsOut[j].g + value, colsOut[j].b + value);
+			}
+		}
+		
 		timer5.Stop ();
 
 		// Update diffuse texture
 		heightMap.SetPixels (colsOut);
 		heightMap.Apply ();
 
-		/*UnityEditor.TextureImporter ti = new UnityEditor.TextureImporter();
-		ti.normalmap = true;
-		ti.convertToNormalmap = true;
-		ti.*/
-
 		// Build Normalmap
-		Texture2D normalMap = new Texture2D(heightMap.width, heightMap.height);
+		Texture2D normalMap = new Texture2D(heightMap.width, heightMap.height, TextureFormat.ARGB32, false);
+
 		Color[] colsNormal = new Color[heightMap.width * heightMap.height];
 		for (int y = 0; y < heightMap.height; ++y)
 		{
 			for (int x = 0; x < heightMap.width; ++x)
 			{
-				float h0 = heightMap.GetPixel(x,y).r;
+				/*float h0 = heightMap.GetPixel(x,y).r;
 				float h1 = heightMap.GetPixel((x + 1) % heightMap.width, y ).r;
 				float h2 = heightMap.GetPixel(x, (y + 1) % heightMap.height ).r;
 
@@ -228,7 +232,17 @@ public class ProceduralMesh : MonoBehaviour
 				//Vector3 n = spherePoints[mapIndex];
 
 				//colsNormal[mapIndex] = new Color(Mathf.Clamp01(n.x * 0.5f + 0.5f),Mathf.Clamp01(n.y * 0.5f + 0.5f),Mathf.Clamp01(n.z * 0.5f + 0.5f));
-				colsNormal[mapIndex] = new Color(n.x * 0.5f + 0.5f,n.y * 0.5f + 0.5f,n.z * 0.5f + 0.5f);
+				colsNormal[mapIndex] = new Color(n.x * 0.5f + 0.5f,n.y * 0.5f + 0.5f,n.z * 0.5f + 0.5f);*/
+
+				float h0 = heightMap.GetPixel(x,y).r;
+				float h1 = heightMap.GetPixel((x + 1) % heightMap.width, y ).r;
+				float h2 = heightMap.GetPixel(x, (y + 1) % heightMap.height ).r;
+				const float bumpFactor = 5.0f;
+				float xDelta = Mathf.Clamp01(((h1-h0)*bumpFactor+1.0f)*0.5f);
+				float yDelta = Mathf.Clamp01(((h0-h2)*bumpFactor+1.0f)*0.5f);
+				int mapIndex = y * heightMap.width + x;
+				colsNormal[mapIndex] = new Color(1.0f,yDelta,1.0f,xDelta);
+				//normalMap.SetPixel(x,y, new Color(1.0f,yDelta,1.0f,xDelta));
 			}
 		}
 		normalMap.SetPixels(colsNormal);
@@ -236,8 +250,8 @@ public class ProceduralMesh : MonoBehaviour
 		normalMap.Apply();
 
 		// Update material
-		//mf.renderer.materials[0].mainTexture = normalMap;
-		//mf.renderer.materials[0].SetTexture("_BumpMap", normalMap);
+		mf.renderer.materials[0].mainTexture = heightMap;
+		mf.renderer.materials[0].SetTexture("_BumpMap", normalMap);
 
 		// Build displacement grid
 
