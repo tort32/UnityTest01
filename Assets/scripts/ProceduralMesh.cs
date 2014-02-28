@@ -69,17 +69,23 @@ public class ProceduralMesh : MonoBehaviour
 			{
 				Vector3 point = spherePoints[n];
 
-				float[] w={2.0f,5.0f,20.0f};
-				float[] a={1.0f,0.3f,0.1f};
+				float[] w={2.0f,5.0f,30.0f};
+				float[] a={1.0f,0.3f,0.2f};
 
 				float value = 0;
 				for(int i = 0; i < 3; ++i)
 				{
-					value += PerlinNoise.GetValue(point * w[i]) * a[i];
+					float delta = PerlinNoise.GetValue(point * w[i]) * a[i];
 					if(i == 0)
 					{
-						value = Mathf.Clamp(value, -0.2f, 0.2f);
+						delta = Mathf.Clamp(delta, -0.2f, 0.2f);
 					}
+					else if(i == 2)
+					{
+						delta = delta*delta*5;
+					}
+					value += delta;
+					
 				}
 
 				heightTmp[n] = height[n] = value;
@@ -88,7 +94,7 @@ public class ProceduralMesh : MonoBehaviour
 		
 		using (new DebugTimer("Morph the surface"))
 		{
-			int impacts = 200;
+			int impacts = 100;
 			for(int i=0; i<impacts; ++i)
 			{
 				// Find impact point
@@ -118,9 +124,9 @@ public class ProceduralMesh : MonoBehaviour
 				}
 
 				// Form a crater around the impact point
-				float sm = 10.0f/(i+50.0f);
+				float sm = 10.0f/(i+20.0f);
 				float sqrSm = sm*sm;
-				float holeDepth = sm * 0.1f;
+				float holeDepth = 2.0f / (sm + 5.0f);
 
 				foreach(int m in oct.GetElementsNearTo(point, sm))
 				{
@@ -128,28 +134,35 @@ public class ProceduralMesh : MonoBehaviour
 					float sqrLen = (point - pointNear).sqrMagnitude;
 					if(sqrLen < sqrSm)
 					{
-						float weight = 2.0f - 1.0f/(2.0f/(1.0f + sqrLen / sqrSm ) - 1.0f); // (1..0)
-						float holeValue = height[n] - holeDepth * weight;
-						float value = Mathf.Min(height[m], holeValue);
+						float weight = 2.0f/(1.0f + Mathf.Sqrt(sqrLen / sqrSm) ) - 1.0f; // (1..0)
+						float weight2 = 2.0f - 0.5f/weight; // (1..-inf)
+
+						float holeValue = height[n] * weight + (1.0f - weight) * height[m] - holeDepth * weight2;
+						float value = Mathf.Min(((height[n] + 1.0f) * weight  + (1.0f - weight) * height[m]), holeValue);
 						heightTmp[m] = value;
 					}
 				}
 
-				float noiseValue = 1.0f/(float)impacts;
+
 				for(int m = 0; m < textureWidth * textureHieght; ++m)
 				{
-					float value = Random.Range(-noiseValue, noiseValue);
-					height[m] = heightTmp[m] + value;
-					//height[m] = heightTmp[m];
+					height[m] = heightTmp[m];
 				}
 			}
+		}
+
+		float noiseValue = 0.02f;
+		for(int m = 0; m < textureWidth * textureHieght; ++m)
+		{
+			float value = Random.Range(-noiseValue, noiseValue);
+			height[m] = heightTmp[m] + value;
 		}
 
 		// Build Diffuse
 		Texture2D heightMap;
 		using (new DebugTimer("Build Diffuse"))
 		{	
-			heightMap = Generator.BuildHeightMap(height,textureWidth,textureHieght, 1.0f);
+			heightMap = Generator.BuildHeightMap(height,textureWidth,textureHieght, 0.5f);
 		}
 
 		// Build Normalmap
