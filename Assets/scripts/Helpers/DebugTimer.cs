@@ -1,7 +1,8 @@
+using System;
 using UnityEngine;
 using System.Diagnostics;
 
-public class DebugTimer
+public class DebugTimer: IDisposable
 {
 	Stopwatch watch;
 	string logString;
@@ -11,7 +12,7 @@ public class DebugTimer
 		watch = new Stopwatch();
 		watch.Start();
 	}
-	public void Stop()
+	public void Dispose()
 	{
 		watch.Stop ();
 		UnityEngine.Debug.Log(string.Format("{0}: {1}", logString, watch.Elapsed));

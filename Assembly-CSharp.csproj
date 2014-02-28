@@ -49,6 +49,7 @@
      <Compile Include="Assets\scripts\FPSController.cs" />
      <Compile Include="Assets\scripts\GhostController.cs" />
      <Compile Include="Assets\scripts\Helpers\DebugTimer.cs" />
+     <Compile Include="Assets\scripts\Helpers\Generator.cs" />
      <Compile Include="Assets\scripts\Helpers\OctGrid.cs" />
      <Compile Include="Assets\scripts\Helpers\PerlinNoise.cs" />
      <Compile Include="Assets\scripts\ProceduralMesh.cs" />
