@@ -69,7 +69,7 @@ public class ProceduralMesh : MonoBehaviour
 			{
 				Vector3 point = spherePoints[n];
 
-				float[] w={2.0f,5.0f,30.0f};
+				float[] w={2.0f,5.0f,20.0f};
 				float[] a={1.0f,0.3f,0.1f};
 
 				float value = 0;
@@ -88,7 +88,7 @@ public class ProceduralMesh : MonoBehaviour
 		
 		using (new DebugTimer("Morph the surface"))
 		{
-			int impacts = 100;
+			int impacts = 200;
 			for(int i=0; i<impacts; ++i)
 			{
 				// Find impact point
@@ -118,9 +118,9 @@ public class ProceduralMesh : MonoBehaviour
 				}
 
 				// Form a crater around the impact point
-				float sm = 2.0f/(Mathf.Sqrt(i)+10.0f);
+				float sm = 10.0f/(i+50.0f);
 				float sqrSm = sm*sm;
-				float holeDepth = sm * 2.0f;
+				float holeDepth = sm * 0.1f;
 
 				foreach(int m in oct.GetElementsNearTo(point, sm))
 				{
@@ -128,19 +128,19 @@ public class ProceduralMesh : MonoBehaviour
 					float sqrLen = (point - pointNear).sqrMagnitude;
 					if(sqrLen < sqrSm)
 					{
-						float weight = 2.0f/(1.0f + sqrLen / sqrSm ) - 1.0f; // (1..0)
-						float holeValue = height[m] - holeDepth * weight;
+						float weight = 2.0f - 1.0f/(2.0f/(1.0f + sqrLen / sqrSm ) - 1.0f); // (1..0)
+						float holeValue = height[n] - holeDepth * weight;
 						float value = Mathf.Min(height[m], holeValue);
 						heightTmp[m] = value;
 					}
 				}
 
-				//float noiseValue = 1.0f/(float)impacts;
+				float noiseValue = 1.0f/(float)impacts;
 				for(int m = 0; m < textureWidth * textureHieght; ++m)
 				{
-					//float value = Random.Range(-noiseValue, noiseValue);
-					//height[m] = heightTmp[m] + value;
-					height[m] = heightTmp[m];
+					float value = Random.Range(-noiseValue, noiseValue);
+					height[m] = heightTmp[m] + value;
+					//height[m] = heightTmp[m];
 				}
 			}
 		}
@@ -167,7 +167,7 @@ public class ProceduralMesh : MonoBehaviour
 		float[] dispMap = new float[slices * slices];
 		using (new DebugTimer("Build vertex dispacement map"))
 		{
-			float sliceSize = 1.0f*Mathf.PI / (float)slices; // sector of the 1 unit circle
+			float sliceSize = 2.0f*Mathf.PI / (float)slices; // sector of the 1 unit circle
 			float sqrSliceSize = sliceSize * sliceSize;
 			for(int j = 0; j < slices; ++j)
 			{
@@ -188,9 +188,9 @@ public class ProceduralMesh : MonoBehaviour
 						float sqrLen = (point - pointNear).sqrMagnitude;
 						if(sqrLen < sqrSliceSize)
 						{
-							//float weight = 2.0f/(1.0f + sqrLen / sqrSliceSize ) - 1.0f; // (1..0)
-							accum += height[m]; //*weight;
-							mass += 1.0f; //weight;
+							float weight = 2.0f/(1.0f + sqrLen / sqrSliceSize ) - 1.0f; // (1..0)
+							accum += height[m] * weight;
+							mass += weight;
 						}
 					}
 					float value = accum/mass;

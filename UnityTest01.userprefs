@@ -1,11 +1,9 @@
 ﻿<Properties>
-  <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" PreferredExecutionTarget="MonoDevelop.Default" />
+  <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" />
   <MonoDevelop.Ide.Workbench ActiveDocument="Assets\scripts\ProceduralMesh.cs">
     <Files>
-      <File FileName="Assets\scripts\Helpers\Generator.cs" Line="40" Column="31" />
-      <File FileName="Assets\scripts\ProceduralMesh.cs" Line="122" Column="25" />
-      <File FileName="Assets\scripts\Rotator.cs" Line="1" Column="1" />
-      <File FileName="Assets\scripts\Helpers\Generator.cs" Line="55" Column="1" />
+      <File FileName="Assets\scripts\ProceduralMesh.cs" Line="123" Column="31" />
+      <File FileName="Assets\scripts\Helpers\Generator.cs" Line="42" Column="53" />
     </Files>
   </MonoDevelop.Ide.Workbench>
   <MonoDevelop.Ide.DebuggingService.Breakpoints>

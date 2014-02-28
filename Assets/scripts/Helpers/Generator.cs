@@ -39,8 +39,8 @@ public class Generator
 				float h0 = heightValues[mapIndex];
 				float h1 = heightValues[mapIndexNextX];
 				float h2 = heightValues[mapIndexNextY];
-				float xDelta = Mathf.Clamp01(((h1-h0)*bumpFactor+1.0f)*0.5f);
-				float yDelta = Mathf.Clamp01(((h0-h2)*bumpFactor+1.0f)*0.5f);
+				float xDelta = Mathf.Clamp01(((h0-h1)*bumpFactor+1.0f)*0.5f);
+				float yDelta = Mathf.Clamp01(((h2-h0)*bumpFactor+1.0f)*0.5f);
 				colsNormal[mapIndex] = new Color(1.0f,yDelta,1.0f,xDelta);
 			}
 		}
